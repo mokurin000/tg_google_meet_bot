@@ -45,6 +45,7 @@ dependencies = [
  "rand",
  "serde_json",
  "teloxide",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",

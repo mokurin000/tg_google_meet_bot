@@ -12,7 +12,7 @@ use ash_meet_bot::AUTHORIZED_USERS;
 use teloxide::repls::CommandReplExt;
 use teloxide::Bot;
 
-use tracing::{debug, error, info};
+use tracing::{debug, error, warn, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -37,8 +37,9 @@ async fn init_calendar_hub() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+use teloxide::payloads::SendMessageSetters;
 use teloxide::requests::{Requester, ResponseResult};
-use teloxide::types::Message;
+use teloxide::types::{Message, ParseMode};
 use teloxide::utils::command::{BotCommands, ParseError};
 #[derive(BotCommands, PartialEq, Debug, Clone)]
 #[command(rename_rule = "lowercase", parse_with = split_once)]
@@ -53,7 +54,14 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         .from()
         .is_some_and(|u| AUTHORIZED_USERS.contains(&u.id.0))
     {
-        info!("unauthorized access from {:#?}", msg.from());
+        warn!("unauthorized access from {:#?}", msg.from());
+        bot.send_message(
+            msg.chat.id,
+            "sorry, this bot is currently single user \n\nyou can run your instance with the [code](https://github.com/poly000/ash_meet_bot)",
+        )
+        .parse_mode(ParseMode::MarkdownV2)
+        .await
+        ?;
         return Ok(());
     }
 
@@ -74,10 +82,13 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
     debug!("{res:#?}");
 
     let Some(meet_link) = get_meet_link(&res.1) else {
+        warn!("did not get meet link with an success request");
+        warn!("may it's an API breaking change/BUG");
         return Ok(());
     };
 
-    bot.send_message(msg.chat.id, meet_link);
+    info!("created sex party at {meet_link}");
+    bot.send_message(msg.chat.id, meet_link).await?;
 
     Ok(())
 }

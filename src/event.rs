@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use crate::calendar3;
 use crate::utils;
 use crate::CALENDAR_HUB;
@@ -45,7 +43,7 @@ fn make_meet_event(
 pub async fn insert_meet_event(
     time: DateTime<Utc>,
     summary: &str,
-) -> Result<(Response<Body>, Event), Box<dyn Error>> {
+) -> Result<(Response<Body>, Event), anyhow::Error> {
     let req = make_meet_event(summary, time, time, Option::<&str>::None);
 
     let result = CALENDAR_HUB
@@ -67,12 +65,18 @@ pub async fn insert_meet_event(
 
     if !res.0.status().is_success() {
         error!("{:#?}", res);
-        return Err("request error".into());
+        return Err(ReqError::FailedCode(res.0.status().as_u16()).into());
     }
 
     debug!("ok: {res:#?}");
 
     Ok(res)
+}
+
+#[derive(Debug, thiserror::Error)]
+enum ReqError {
+    #[error("Error code: {0}")]
+    FailedCode(u16),
 }
 
 pub fn get_meet_link(event: &Event) -> Option<&str> {
