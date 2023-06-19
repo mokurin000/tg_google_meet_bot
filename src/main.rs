@@ -12,13 +12,24 @@ use ash_meet_bot::AUTHORIZED_USERS;
 use teloxide::repls::CommandReplExt;
 use teloxide::Bot;
 
-use tracing::{debug, error, warn, info};
+use tracing::{debug, error, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt().init();
 
     init_calendar_hub().await?;
+
+    info!(
+        "Authorized users: {:#?}",
+        AUTHORIZED_USERS.get_or_init(|| {
+            std::env::var("AUTHORIZED_USERS")
+                .unwrap()
+                .split(',')
+                .filter_map(|id| id.trim().parse().ok())
+                .collect()
+        })
+    );
 
     let bot = Bot::from_env();
 
@@ -28,6 +39,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn init_calendar_hub() -> Result<(), Box<dyn Error>> {
+    dotenv::dotenv().ok();
+
     let hub = build_calendar_hub().await?;
 
     CALENDAR_HUB
@@ -52,7 +65,7 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
 
     if !msg
         .from()
-        .is_some_and(|u| AUTHORIZED_USERS.contains(&u.id.0))
+        .is_some_and(|u| AUTHORIZED_USERS.get().unwrap().contains(&u.id.0))
     {
         warn!("unauthorized access from {:#?}", msg.from());
         bot.send_message(
@@ -60,6 +73,8 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
             "sorry, this bot is currently single user \n\nyou can run your instance with the [code](https://github.com/poly000/ash_meet_bot)",
         )
         .parse_mode(ParseMode::MarkdownV2)
+        .reply_to_message_id(msg.id)
+        .disable_web_page_preview(true)
         .await
         ?;
         return Ok(());
@@ -75,7 +90,9 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
                 let e = result.unwrap_err();
                 error!("{e}");
                 let error = format!("请求错误：{e}");
-                bot.send_message(msg.chat.id, &error).await?;
+                bot.send_message(msg.chat.id, &error)
+                    .reply_to_message_id(msg.id)
+                    .await?;
                 return Ok(());
             };
 
@@ -87,8 +104,10 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         return Ok(());
     };
 
-    info!("created sex party at {meet_link}");
-    bot.send_message(msg.chat.id, meet_link).await?;
+    info!("created sex party {meet_link} at {time}");
+    bot.send_message(msg.chat.id, meet_link)
+        .reply_to_message_id(msg.id)
+        .await?;
 
     Ok(())
 }
