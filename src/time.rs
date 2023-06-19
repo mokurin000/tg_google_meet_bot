@@ -4,8 +4,11 @@ use calendar3::chrono;
 use chrono::{DateTime, Duration, Utc};
 use chrono::{NaiveDate, NaiveTime};
 
+use tracing::debug;
+
 pub fn parse_time(input: &str) -> Option<DateTime<Utc>> {
     let now = utc8_now();
+    debug!("now: {now}");
     let mut input = input.trim().split_whitespace();
     let time = input.next().unwrap_or_default();
     let date = input.next().unwrap_or_default();

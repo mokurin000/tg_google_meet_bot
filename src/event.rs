@@ -41,10 +41,10 @@ fn make_meet_event(
 }
 
 pub async fn insert_meet_event(
-    time: DateTime<Utc>,
+    utc_time: DateTime<Utc>,
     summary: &str,
 ) -> Result<(Response<Body>, Event), anyhow::Error> {
-    let req = make_meet_event(summary, time, time, Option::<&str>::None);
+    let req = make_meet_event(summary, utc_time, utc_time, Some("Asia/Shanghai"));
 
     let result = CALENDAR_HUB
         .get()

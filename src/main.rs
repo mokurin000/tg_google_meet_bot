@@ -9,6 +9,7 @@ use ash_meet_bot::CALENDAR_HUB;
 
 use ash_meet_bot::AUTHORIZED_USERS;
 
+use google_calendar3::chrono::Duration;
 use teloxide::repls::CommandReplExt;
 use teloxide::Bot;
 
@@ -16,10 +17,14 @@ use tracing::{debug, error, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt().init();
+    let env_filter = tracing_subscriber::EnvFilter::from_default_env();
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(env_filter)
+        .init();
 
     init_calendar_hub().await?;
 
+    dotenv::dotenv().ok();
     info!(
         "Authorized users: {:#?}",
         AUTHORIZED_USERS.get_or_init(|| {
@@ -39,8 +44,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn init_calendar_hub() -> Result<(), Box<dyn Error>> {
-    dotenv::dotenv().ok();
-
     let hub = build_calendar_hub().await?;
 
     CALENDAR_HUB
@@ -83,8 +86,9 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
     let Some(time) = parse_time(&time) else {
         return Ok(());
     };
+    let utc_time = time.checked_sub_signed(Duration::hours(8)).unwrap();
 
-    let result = insert_meet_event(time, &summary).await;
+    let result = insert_meet_event(utc_time, &summary).await;
 
     let Ok(res) = result else {
                 let e = result.unwrap_err();
