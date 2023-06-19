@@ -1,19 +1,21 @@
 use crate::calendar3;
 
 use calendar3::hyper_rustls::HttpsConnector;
+use calendar3::oauth2::ConsoleApplicationSecret;
 use calendar3::{hyper, hyper_rustls, oauth2, CalendarHub};
 use hyper::client::HttpConnector;
 
 use tracing::info;
 
-#[derive(serde::Deserialize, serde::Serialize)]
-struct Installed {
-    pub installed: oauth2::ApplicationSecret,
-}
-
-pub async fn build_calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>, anyhow::Error> {
-    let Installed { installed: secret } =
-        serde_json::from_str(include_str!("../client_secret.json"))?;
+pub async fn build_calendar_hub(
+) -> Result<CalendarHub<HttpsConnector<HttpConnector>>, anyhow::Error> {
+    let ConsoleApplicationSecret {
+        installed: secret,
+        web: web_secret,
+    } = serde_json::from_str(include_str!("../client_secret.json"))?;
+    let secret = secret
+        .or(web_secret)
+        .expect("both installed and web was not found!");
 
     info!("Starting auth...");
 

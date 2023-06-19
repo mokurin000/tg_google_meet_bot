@@ -30,7 +30,6 @@ dependencies = [
  "anyhow",
  "google-calendar3",
  "rand",
- "serde",
  "serde_json",
  "tokio",
  "tracing",

@@ -2,3 +2,5 @@
 client_secret.json
 
 oauth_status.json
+
+.env

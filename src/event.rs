@@ -1,11 +1,18 @@
+use std::error::Error;
+
+use crate::CALENDAR_HUB;
 use crate::calendar3;
 use crate::utils;
 
 use calendar3::api::{ConferenceData, ConferenceSolutionKey, Event, EventDateTime};
 use calendar3::chrono::{DateTime, Utc};
+use calendar3::hyper::Body;
+use calendar3::hyper::Response;
+use tracing::debug;
+use tracing::error;
 
-pub fn make_meet_event(
-    title: impl Into<String>,
+fn make_meet_event(
+    summary: impl Into<String>,
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
     timezone: Option<impl Into<String> + Clone>,
@@ -20,7 +27,7 @@ pub fn make_meet_event(
         ..Default::default()
     });
     req.conference_data = Some(conf_data);
-    req.summary = Some(title.into());
+    req.summary = Some(summary.into());
     req.start = Some(EventDateTime {
         date_time: Some(start_time),
         time_zone: timezone.clone().map(|s| s.into()),
@@ -32,4 +39,37 @@ pub fn make_meet_event(
         ..Default::default()
     });
     req
+}
+
+pub async fn insert_meet_event(
+    time: DateTime<Utc>,
+    summary: &str,
+) -> Result<(Response<Body>, Event), Box<dyn Error>> {
+    let req = make_meet_event(summary, time, time, Option::<&str>::None);
+
+    let result = CALENDAR_HUB
+        .get()
+        .unwrap()
+        .events()
+        .insert(req, "primary")
+        .supports_attachments(true)
+        .send_notifications(true)
+        .conference_data_version(1)
+        .doit()
+        .await;
+
+    let Ok(res) = result else {
+        let e = result.unwrap_err();
+        error!("{e}");
+        return Err(e)?;
+    };
+
+    if !res.0.status().is_success() {
+        error!("{:#?}", res);
+        return Err("request error".into());
+    }
+
+    debug!("ok: {res:#?}");
+
+    Ok(res)
 }
