@@ -1,9 +1,10 @@
 use std::error::Error;
 
-use crate::CALENDAR_HUB;
 use crate::calendar3;
 use crate::utils;
+use crate::CALENDAR_HUB;
 
+use calendar3::api::EntryPoint;
 use calendar3::api::{ConferenceData, ConferenceSolutionKey, Event, EventDateTime};
 use calendar3::chrono::{DateTime, Utc};
 use calendar3::hyper::Body;
@@ -72,4 +73,16 @@ pub async fn insert_meet_event(
     debug!("ok: {res:#?}");
 
     Ok(res)
+}
+
+pub fn get_meet_link(event: &Event) -> Option<&str> {
+    event
+        .conference_data
+        .as_ref()
+        .and_then(|cdata| cdata.entry_points.as_ref())
+        .and_then(|entry| {
+            entry
+                .get(0)
+                .and_then(|EntryPoint { uri, .. }| uri.as_deref())
+        })
 }
