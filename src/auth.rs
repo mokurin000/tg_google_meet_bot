@@ -12,7 +12,7 @@ pub async fn build_calendar_hub(
     let ConsoleApplicationSecret {
         installed: secret,
         web: web_secret,
-    } = serde_json::from_str(include_str!("../client_secret.json"))?;
+    } = serde_json::from_str(&std::fs::read_to_string("client_secret.json")?)?;
     let secret = secret
         .or(web_secret)
         .expect("both installed and web was not found!");
