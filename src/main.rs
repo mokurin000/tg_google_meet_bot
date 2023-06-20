@@ -25,16 +25,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     init_calendar_hub().await?;
 
     dotenv::dotenv().ok();
-    info!(
-        "Authorized users: {:#?}",
-        AUTHORIZED_USERS.get_or_init(|| {
-            std::env::var("AUTHORIZED_USERS")
-                .unwrap()
-                .split(',')
-                .filter_map(|id| id.trim().parse().ok())
-                .collect()
-        })
-    );
 
     let bot = Bot::from_env();
     MeetCommand::repl(bot, answer).await;
@@ -65,10 +55,17 @@ enum MeetCommand {
 async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> {
     let MeetCommand::Meet(summary, time_str) = cmd;
 
-    if !msg
-        .from()
-        .is_some_and(|u| AUTHORIZED_USERS.get().unwrap().contains(&u.id.0))
-    {
+    if !msg.from().is_some_and(|u| {
+        AUTHORIZED_USERS
+            .get_or_init(|| {
+                std::env::var("AUTHORIZED_USERS")
+                    .unwrap()
+                    .split(',')
+                    .filter_map(|id| id.trim().parse().ok())
+                    .collect()
+            })
+            .contains(&u.id.0)
+    }) {
         warn!("unauthorized access from {:#?}", msg.from());
         bot.send_message(
             msg.chat.id,
@@ -126,5 +123,5 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
 
 fn split_once(s: String) -> Result<(String, String), ParseError> {
     let (summary, time) = s.split_once('|').unwrap_or((&s, ""));
-    Ok((summary.into(), time.into()))
+    Ok((summary.trim().into(), time.into()))
 }
