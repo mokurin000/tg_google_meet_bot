@@ -3,13 +3,13 @@ use std::error::Error;
 use anyhow::Result;
 use ash_meet_bot::auth::build_calendar_hub;
 use ash_meet_bot::event::{get_meet_link, insert_meet_event};
-use ash_meet_bot::time::parse_time;
+use ash_meet_bot::time::{parse_time_to_utc, utc8_now};
 
 use ash_meet_bot::CALENDAR_HUB;
 
 use ash_meet_bot::AUTHORIZED_USERS;
 
-use google_calendar3::chrono::{Duration, FixedOffset, TimeZone};
+use google_calendar3::chrono::{FixedOffset, TimeZone};
 use teloxide::repls::CommandReplExt;
 use teloxide::Bot;
 
@@ -37,7 +37,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let bot = Bot::from_env();
-
     MeetCommand::repl(bot, answer).await;
 
     Ok(())
@@ -64,7 +63,7 @@ enum MeetCommand {
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> {
-    let MeetCommand::Meet(summary, time) = cmd;
+    let MeetCommand::Meet(summary, time_str) = cmd;
 
     if !msg
         .from()
@@ -83,11 +82,10 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         return Ok(());
     }
 
-    let Some(time) = parse_time(&time) else {
+    let now = utc8_now();
+    let Some(utc_time) = parse_time_to_utc(&time_str, now) else {
         return Ok(());
     };
-    let utc_time = time.checked_sub_signed(Duration::hours(8)).unwrap();
-
     let result = insert_meet_event(utc_time, &summary).await;
 
     let Ok(res) = result else {
@@ -108,14 +106,16 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         return Ok(());
     };
 
-    info!("created sex party {meet_link} at {time}");
+    info!("created sex party {meet_link} at {utc_time}");
+
     bot.send_message(
         msg.chat.id,
         format!(
-            "created {meet_link} at {}",
+            "created {meet_link} at {}\ntitle: {summary}",
             FixedOffset::east_opt(3600 * 8)
                 .map(|fo| fo.from_utc_datetime(&utc_time.naive_utc()))
                 .unwrap()
+                .to_rfc2822()
         ),
     )
     .reply_to_message_id(msg.id)
