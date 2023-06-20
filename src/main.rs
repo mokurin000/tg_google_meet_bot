@@ -117,6 +117,6 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
 }
 
 fn split_once(s: String) -> Result<(String, String), ParseError> {
-    let (summary, time) = s.split_once(" ").unwrap_or((&s, ""));
+    let (summary, time) = s.split_once('|').unwrap_or((&s, ""));
     Ok((summary.into(), time.into()))
 }
