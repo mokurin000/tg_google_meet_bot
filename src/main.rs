@@ -9,7 +9,7 @@ use ash_meet_bot::CALENDAR_HUB;
 
 use ash_meet_bot::AUTHORIZED_USERS;
 
-use google_calendar3::chrono::Duration;
+use google_calendar3::chrono::{Duration, FixedOffset, TimeZone};
 use teloxide::repls::CommandReplExt;
 use teloxide::Bot;
 
@@ -109,9 +109,17 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
     };
 
     info!("created sex party {meet_link} at {time}");
-    bot.send_message(msg.chat.id, meet_link)
-        .reply_to_message_id(msg.id)
-        .await?;
+    bot.send_message(
+        msg.chat.id,
+        format!(
+            "created {meet_link} at {}",
+            FixedOffset::east_opt(3600 * 8)
+                .map(|fo| fo.from_utc_datetime(&utc_time.naive_utc()))
+                .unwrap()
+        ),
+    )
+    .reply_to_message_id(msg.id)
+    .await?;
 
     Ok(())
 }
