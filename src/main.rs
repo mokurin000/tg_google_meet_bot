@@ -51,8 +51,10 @@ use teloxide::utils::command::{BotCommands, ParseError};
 enum MeetCommand {
     #[command(description = "display this text.")]
     Help,
-    #[command(description = "/meet title [|[date][|duration]], [] means optional")]
-    Meet(String, String, String),
+    #[command(
+        description = "/meet hh:mm [|[DD/MM/YYYY][|duration]], [] means optional\nfor the duration format check https://docs.rs/duration-str/"
+    )]
+    Meet(String, String, Option<String>),
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> {
@@ -60,11 +62,12 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         let description = MeetCommand::descriptions().to_string();
         bot.send_message(msg.chat.id, description)
             .reply_to_message_id(msg.id)
+            .disable_web_page_preview(true)
             .await?;
         return Ok(());
     }
 
-    let MeetCommand::Meet(summary, time_str, _duration) = cmd else {
+    let MeetCommand::Meet(summary, time_str, duration) = cmd else {
         unreachable!()
     };
 
@@ -83,8 +86,8 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
     }
 
     let now = utc8_now();
-    let time_parsed = parse_time_to_utc(&time_str, now);
-    let Ok(utc_time) =  time_parsed else {
+    let time_parsed = parse_time_to_utc(&time_str, duration.as_deref(), now);
+    let Ok((start_time, end_time)) =  time_parsed else {
         let error = time_parsed.unwrap_err();
 
         bot.send_message(
@@ -96,7 +99,7 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         ?;
         return Ok(());
     };
-    let result = insert_meet_event(utc_time, &summary).await;
+    let result = insert_meet_event(start_time, end_time, &summary).await;
 
     let Ok(res) = result else {
                 let e = result.unwrap_err().to_string();
@@ -115,14 +118,18 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         return Ok(());
     };
 
-    info!("created sex party {meet_link} at {utc_time}");
+    info!("created sex party {meet_link} from {start_time} to {end_time}");
 
     bot.send_message(
         msg.chat.id,
         format!(
-            "created {meet_link} at {}\ntitle: {summary}",
+            "created {meet_link}\ntitle: {summary}, start: {}, end: {}",
             FixedOffset::east_opt(3600 * 8)
-                .map(|fo| fo.from_utc_datetime(&utc_time.naive_utc()))
+                .map(|fo| fo.from_utc_datetime(&start_time.naive_utc()))
+                .unwrap()
+                .to_rfc3339(),
+            FixedOffset::east_opt(3600 * 8)
+                .map(|fo| fo.from_utc_datetime(&end_time.naive_utc()))
                 .unwrap()
                 .to_rfc3339()
         ),
@@ -145,14 +152,18 @@ fn is_admin(user: u64) -> bool {
         .contains(&user)
 }
 
-fn split_once(s: String) -> Result<(String, String, String), ParseError> {
-    split_once_imp(&s).map(|(l, r, p)| (l.into(), r.into(), p.into()))
+fn split_once(s: String) -> Result<(String, String, Option<String>), ParseError> {
+    split_once_imp(&s).map(|(l, r, p)| (l.into(), r.into(), p.map(|s| s.into())))
 }
 
-fn split_once_imp(s: &str) -> Result<(&str, &str, &str), ParseError> {
+fn split_once_imp(s: &str) -> Result<(&str, &str, Option<&str>), ParseError> {
     let (summary, time) = s.split_once('|').unwrap_or((&s, ""));
     let (time, duration) = time.split_once('|').unwrap_or((time, ""));
-    Ok((summary.trim(), time.trim(), duration.trim()))
+    if duration.is_empty() {
+        Ok((summary.trim(), time.trim(), None))
+    } else {
+        Ok((summary.trim(), time.trim(), Some(duration)))
+    }
 }
 
 #[cfg(test)]
@@ -161,12 +172,12 @@ mod test {
 
     use crate::split_once_imp;
 
-    #[test_case("Sex Party | 12:00  " => ("Sex Party", "12:00", ""))]
-    #[test_case(" Sex Party | " => ("Sex Party", "", ""))]
-    #[test_case("  Sex Party Plus  " => ("Sex Party Plus", "", ""))]
-    #[test_case("淫趴 || 12s" => ("淫趴", "", "12s"))]
-    #[test_case("淫趴 | 12:00| 12s" => ("淫趴", "12:00", "12s"))]
-    fn test_command_split(input: &str) -> (&str, &str, &str) {
+    #[test_case("Sex Party | 12:00  " => ("Sex Party", "12:00", None))]
+    #[test_case(" Sex Party | " => ("Sex Party", "", None))]
+    #[test_case("  Sex Party Plus  " => ("Sex Party Plus", "", None))]
+    #[test_case("淫趴 || 12s" => ("淫趴", "", Some("12s")))]
+    #[test_case("淫趴 | 12:00| 12m" => ("淫趴", "12:00", Some("12s")))]
+    fn test_command_split(input: &str) -> (&str, &str, Option<&str>) {
         split_once_imp(input).unwrap()
     }
 }

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 dotenv = "0.15.0"
+duration-str = { version = "0.5.1", default-features = false, features = ["chrono"] }
 google-calendar3 = "5.0.2"
 rand = "0.8.5"
 serde_json = "1.0.97"
