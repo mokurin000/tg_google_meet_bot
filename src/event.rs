@@ -2,13 +2,11 @@ use crate::calendar3;
 use crate::utils;
 use crate::CALENDAR_HUB;
 
-use calendar3::api::EntryPoint;
-use calendar3::api::{ConferenceData, ConferenceSolutionKey, Event, EventDateTime};
+use calendar3::api::{ConferenceData, ConferenceSolutionKey, EntryPoint, Event, EventDateTime};
 use calendar3::chrono::{DateTime, Utc};
-use calendar3::hyper::Body;
-use calendar3::hyper::Response;
-use tracing::debug;
+use calendar3::hyper::{Body, Response};
 use tracing::error;
+use tracing::trace;
 
 fn make_meet_event(
     summary: impl Into<String>,
@@ -68,7 +66,7 @@ pub async fn insert_meet_event(
         return Err(ReqError::FailedCode(res.0.status().as_u16()).into());
     }
 
-    debug!("ok: {res:#?}");
+    trace!("ok: {res:#?}");
 
     Ok(res)
 }

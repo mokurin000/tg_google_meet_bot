@@ -13,7 +13,7 @@ use google_calendar3::chrono::{FixedOffset, TimeZone};
 use teloxide::repls::CommandReplExt;
 use teloxide::Bot;
 
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -47,13 +47,26 @@ use teloxide::requests::{Requester, ResponseResult};
 use teloxide::types::{Message, ParseMode};
 use teloxide::utils::command::{BotCommands, ParseError};
 #[derive(BotCommands, PartialEq, Debug, Clone)]
-#[command(rename_rule = "lowercase", parse_with = split_once)]
+#[command(rename_rule = "lowercase", parse_with = split_once, description = "These commands are supported:")]
 enum MeetCommand {
+    #[command(description = "display this text.")]
+    Help,
+    #[command(description = "/meet title [|date]")]
     Meet(String, String),
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> {
-    let MeetCommand::Meet(summary, time_str) = cmd;
+    if cmd == MeetCommand::Help {
+        let description = MeetCommand::descriptions().to_string();
+        bot.send_message(msg.chat.id, description)
+            .reply_to_message_id(msg.id)
+            .await?;
+        return Ok(());
+    }
+
+    let MeetCommand::Meet(summary, time_str) = cmd else {
+        unreachable!()
+    };
 
     if !msg.from().is_some_and(|u| {
         AUTHORIZED_USERS
@@ -80,22 +93,31 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
     }
 
     let now = utc8_now();
-    let Some(utc_time) = parse_time_to_utc(&time_str, now) else {
+    let time_parsed = parse_time_to_utc(&time_str, now);
+    let Ok(utc_time) =  time_parsed else {
+        let error = time_parsed.unwrap_err();
+
+        bot.send_message(
+            msg.chat.id,
+            format!("time format error: {error}"),
+        )
+        .reply_to_message_id(msg.id)
+        .await
+        ?;
         return Ok(());
     };
     let result = insert_meet_event(utc_time, &summary).await;
 
     let Ok(res) = result else {
-                let e = result.unwrap_err();
+                let e = result.unwrap_err().to_string();
                 error!("{e}");
-                let error = format!("请求错误：{e}");
-                bot.send_message(msg.chat.id, &error)
+                bot.send_message(msg.chat.id, e)
                     .reply_to_message_id(msg.id)
                     .await?;
                 return Ok(());
             };
 
-    debug!("{res:#?}");
+    trace!("{res:#?}");
 
     let Some(meet_link) = get_meet_link(&res.1) else {
         warn!("did not get meet link with an success request");
