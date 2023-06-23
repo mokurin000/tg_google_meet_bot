@@ -144,6 +144,24 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
 }
 
 fn split_once(s: String) -> Result<(String, String), ParseError> {
+    split_once_imp(&s).map(|(l, r)| (l.into(), r.into()))
+}
+
+fn split_once_imp(s: &str) -> Result<(&str, &str), ParseError> {
     let (summary, time) = s.split_once('|').unwrap_or((&s, ""));
-    Ok((summary.trim().into(), time.into()))
+    Ok((summary.trim(), time.trim()))
+}
+
+#[cfg(test)]
+mod test {
+    use test_case::test_case;
+
+    use crate::split_once_imp;
+
+    #[test_case("Sex Party | 12:00  " => ("Sex Party", "12:00"))]
+    #[test_case(" Sex Party | " => ("Sex Party", ""))]
+    #[test_case("  Sex Party Plus  " => ("Sex Party Plus", ""))]
+    fn test_command_split(input: &str) -> (&str, &str) {
+        split_once_imp(input).unwrap()
+    }
 }
