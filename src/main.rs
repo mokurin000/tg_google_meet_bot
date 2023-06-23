@@ -123,7 +123,7 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
     bot.send_message(
         msg.chat.id,
         format!(
-            "created {meet_link}\ntitle: {summary}, start: {}, end: {}",
+            "created {meet_link}\ntitle: {summary}\nstart: {}\nend: {}",
             FixedOffset::east_opt(3600 * 8)
                 .map(|fo| fo.from_utc_datetime(&start_time.naive_utc()))
                 .unwrap()
