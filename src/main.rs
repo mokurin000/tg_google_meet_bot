@@ -51,8 +51,8 @@ use teloxide::utils::command::{BotCommands, ParseError};
 enum MeetCommand {
     #[command(description = "display this text.")]
     Help,
-    #[command(description = "/meet title [|date]")]
-    Meet(String, String),
+    #[command(description = "/meet title [|[date][|duration]], [] means optional")]
+    Meet(String, String, String),
 }
 
 async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> {
@@ -64,21 +64,11 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
         return Ok(());
     }
 
-    let MeetCommand::Meet(summary, time_str) = cmd else {
+    let MeetCommand::Meet(summary, time_str, _duration) = cmd else {
         unreachable!()
     };
 
-    if !msg.from().is_some_and(|u| {
-        AUTHORIZED_USERS
-            .get_or_init(|| {
-                std::env::var("AUTHORIZED_USERS")
-                    .unwrap()
-                    .split(',')
-                    .filter_map(|id| id.trim().parse().ok())
-                    .collect()
-            })
-            .contains(&u.id.0)
-    }) {
+    if !msg.from().is_some_and(|u| is_admin(u.id.0)) {
         warn!("unauthorized access from {:#?}", msg.from());
         bot.send_message(
             msg.chat.id,
@@ -134,7 +124,7 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
             FixedOffset::east_opt(3600 * 8)
                 .map(|fo| fo.from_utc_datetime(&utc_time.naive_utc()))
                 .unwrap()
-                .to_rfc2822()
+                .to_rfc3339()
         ),
     )
     .reply_to_message_id(msg.id)
@@ -143,13 +133,26 @@ async fn answer(bot: Bot, msg: Message, cmd: MeetCommand) -> ResponseResult<()> 
     Ok(())
 }
 
-fn split_once(s: String) -> Result<(String, String), ParseError> {
-    split_once_imp(&s).map(|(l, r)| (l.into(), r.into()))
+fn is_admin(user: u64) -> bool {
+    AUTHORIZED_USERS
+        .get_or_init(|| {
+            std::env::var("AUTHORIZED_USERS")
+                .unwrap()
+                .split(',')
+                .filter_map(|id| id.trim().parse().ok())
+                .collect()
+        })
+        .contains(&user)
 }
 
-fn split_once_imp(s: &str) -> Result<(&str, &str), ParseError> {
+fn split_once(s: String) -> Result<(String, String, String), ParseError> {
+    split_once_imp(&s).map(|(l, r, p)| (l.into(), r.into(), p.into()))
+}
+
+fn split_once_imp(s: &str) -> Result<(&str, &str, &str), ParseError> {
     let (summary, time) = s.split_once('|').unwrap_or((&s, ""));
-    Ok((summary.trim(), time.trim()))
+    let (time, duration) = time.split_once('|').unwrap_or((time, ""));
+    Ok((summary.trim(), time.trim(), duration.trim()))
 }
 
 #[cfg(test)]
@@ -158,10 +161,12 @@ mod test {
 
     use crate::split_once_imp;
 
-    #[test_case("Sex Party | 12:00  " => ("Sex Party", "12:00"))]
-    #[test_case(" Sex Party | " => ("Sex Party", ""))]
-    #[test_case("  Sex Party Plus  " => ("Sex Party Plus", ""))]
-    fn test_command_split(input: &str) -> (&str, &str) {
+    #[test_case("Sex Party | 12:00  " => ("Sex Party", "12:00", ""))]
+    #[test_case(" Sex Party | " => ("Sex Party", "", ""))]
+    #[test_case("  Sex Party Plus  " => ("Sex Party Plus", "", ""))]
+    #[test_case("淫趴 || 12s" => ("淫趴", "", "12s"))]
+    #[test_case("淫趴 | 12:00| 12s" => ("淫趴", "12:00", "12s"))]
+    fn test_command_split(input: &str) -> (&str, &str, &str) {
         split_once_imp(input).unwrap()
     }
 }
