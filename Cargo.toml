@@ -13,7 +13,7 @@ google-calendar3 = "5.0.2"
 rand = "0.8.5"
 serde_json = "1.0.99"
 teloxide = { version = "0.12.2", features = ["ctrlc_handler", "macros"] }
-thiserror = "1.0.40"
+thiserror = "1.0.43"
 tokio = { version = "1.29.1", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
