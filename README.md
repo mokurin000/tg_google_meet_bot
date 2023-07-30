@@ -1,6 +1,6 @@
 # ash_meet_bot
 
-Google meets insert bot, originally written for [`ash`](https://t.me/ash_202888)
+Google meets insert bot, originally written for [`ash`](https://t.me/wowjerry)
 
 ## Prepare
 
