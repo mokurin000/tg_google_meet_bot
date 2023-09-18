@@ -19,7 +19,7 @@ tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 
 [dev-dependencies]
-test-case = "3.1.0"
+test-case = "3.2.1"
 
 [profile.release]
 opt-level = 3
